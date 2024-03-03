@@ -6,3 +6,5 @@
 - Première étape : on input une piste .wav au modèle, qui output une liste des instruments
 
 - Étape finale : on fait écouter un audio au modèle, qui output en temps réel une liste d'instruments
+
+Raccourcis : cello (cel), clarinet (cla), flute (flu), acoustic guitar (gac), electric guitar (gel), organ (org), piano (pia), saxophone (sax), trumpet (tru), violin (vio), and human singing voice (voi)
