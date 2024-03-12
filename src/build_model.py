@@ -119,6 +119,7 @@ model = keras.models.Sequential(
 )
 
 model.summary()
+model.save('audio_model.h5')
 
 optimizer = keras.optimizers.Adam(learning_rate=0.001)
 model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
