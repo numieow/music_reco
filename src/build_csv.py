@@ -16,8 +16,6 @@ def build_test_csv(folder_paths, csv_file_name):
     # Get the list of files in the folders
     files = [os.listdir(folder_path) for folder_path in folder_paths]
 
-    print('Test/Part1/Queen of the Stone Age - 08 - Go With the Flow-4.txt' in files[0])
-
     # Create a csv file
     with open(csv_file_name, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -32,7 +30,7 @@ def build_test_csv(folder_paths, csv_file_name):
                     with open(folder_paths[i] + file, 'r') as f:
                         lines = f.readlines()
                         for line in lines:
-                            file_name = file.split('.txt')[0]
+                            file_name = folder_paths[i] + file.split('.txt')[0]
                             writer.writerow([file_name, line.strip()])
 
     # Read the csv file and return the dataframe
