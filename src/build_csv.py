@@ -57,13 +57,12 @@ def build_train_csv(folder_paths, csv_file_name):
         # Go through the files and extract the data
         for i in range(len(folder_paths)):
             for file in tqdm.tqdm(files[i]):
-                y, sr = librosa.load(folder_paths[i] + file)
+                file_name = folder_paths[i] + file
+                y, sr = librosa.load(file_name)
                 duration = librosa.get_duration(y=y, sr=sr)
                 file = file.split('.wav')[0]
                 first_bracket = file.find('[')
                 last_bracket = file.rfind(']')
-
-                file_name = file[0:first_bracket] + file[last_bracket+1:]
                 
                 instruments_init = file[first_bracket:last_bracket+1]
                 instruments = instruments_init
