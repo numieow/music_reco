@@ -52,7 +52,7 @@ def build_train_csv(folder_paths, csv_file_name):
         writer = csv.writer(csvfile)
 
         # Write the header
-        writer.writerow(['Track Name', 'Instrument, Duration'])
+        writer.writerow(['Track Name', 'Instrument', 'Duration'])
 
         # Go through the files and extract the data
         for i in range(len(folder_paths)):
