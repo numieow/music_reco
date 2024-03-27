@@ -150,7 +150,7 @@ model = keras.models.Sequential(
 )
 
 model.summary()
-optimizer = keras.optimizers.Adam(learning_rate=0.001)
+optimizer = keras.optimizers.Adam(learning_rate=0.0001)
 model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
 
 """
@@ -212,14 +212,24 @@ with open("y_test", "wb") as fp:   #Pickling
     pickle.dump(y_test, fp)
 """
 
+# explicit function to normalize array
+def normalize_2d(matrix):
+    norm = np.linalg.norm(matrix)
+    matrix = matrix/norm  # normalized matrix
+    return matrix
+
 with open("x_train", "rb") as fp:   # Unpickling
     x_train = pickle.load(fp)
-    
+    for i in range(len(x_train)):
+        x_train[i] = normalize_2d(x_train[i])
+
 with open("y_train", "rb") as fp:   # Unpickling
     y_train = pickle.load(fp)
 
 with open("x_test", "rb") as fp:   # Unpickling
     x_test = pickle.load(fp)
+    for i in range(len(x_test)):
+        x_test[i] = normalize_2d(x_test[i])
     
 with open("y_test", "rb") as fp:   # Unpickling
     y_test = pickle.load(fp)
@@ -228,7 +238,7 @@ with open("y_test", "rb") as fp:   # Unpickling
 #print("y_train : ", len(y_train))
 #print("x_test : ", len(x_test))
 #print("y_test : ", len(y_test))
-"""
+
 checkpoint_path = "audio_model.keras"
 
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
@@ -239,7 +249,7 @@ model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     verbose=1
 )
 hist = model.fit(x_train, y_train, batch_size=64, epochs=5, validation_split=0.2, callbacks=[model_checkpoint_callback])
-"""
+
 #Load model
 loaded = keras.models.load_model("audio_model.keras")
 
