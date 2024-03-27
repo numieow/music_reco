@@ -156,24 +156,61 @@ model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["ac
 """
 train_df = pd.read_csv(train_data_path)
 train_track_names = pd.unique(train_df['Track Name'])
+
 x_train = [spectro_extract('../data/' + file) for file in tqdm(train_track_names)]
-with open("x_train", "wb") as fp:   #Pickling
-    pickle.dump(x_train, fp)
+
+for i in tqdm(range(len(x_train))):
+    x_train[i] = tf.convert_to_tensor(x_train[i], dtype=tf.float32)
+
 y_train = [train_df[train_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(train_track_names)]
 y_train = one_hot_encode(y_train)
+
+for i in tqdm(range(len(y_train))):
+    y_train[i] = tf.convert_to_tensor(y_train[i], dtype=tf.float32)
+
+x_train = np.array(x_train)
+y_train = np.array(y_train)
+
+with open("x_train", "wb") as fp:   #Pickling
+    pickle.dump(x_train, fp)
 with open("y_train", "wb") as fp:   #Pickling
     pickle.dump(y_train, fp)
 
 
 test_df = pd.read_csv(test_data_path)
 test_track_names = pd.unique(test_df['Track Name'])
+
 x_test = [create_test_tracks('../data/' + file + '.wav') for file in tqdm(test_track_names)]
-with open("x_test", "wb") as fp:   #Pickling
-    pickle.dump(x_test, fp)
+for i in tqdm(range(len(x_test))):
+    x_test[i] = tf.convert_to_tensor(x_test[i], dtype=tf.float32)
+
 y_test = [test_df[test_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(test_track_names)]
 y_test = one_hot_encode(y_test)
+for i in tqdm(range(len(y_test))):
+    y_test[i] = tf.convert_to_tensor(y_test[i], dtype=tf.float32)
+
+new_x_test = []
+new_y_test = []
+for i in tqdm(range(len(x_test))):
+    curr_list = x_test[i]
+    for elem in curr_list:
+        print(elem.shape)
+        new_x_test.append(elem)
+        new_y_test.append(y_test[i])
+
+x_test = np.array(new_x_test)
+y_test = np.array(new_y_test)
+
+print(len("x_test : "), x_test)
+print(len("y_test : "), y_test)
+
+
+
+with open("x_test", "wb") as fp:   #Pickling
+    pickle.dump(x_test, fp)
 with open("y_test", "wb") as fp:   #Pickling
-    pickle.dump(y_test, fp)"""
+    pickle.dump(y_test, fp)
+"""
 
 with open("x_train", "rb") as fp:   # Unpickling
     x_train = pickle.load(fp)
@@ -187,16 +224,12 @@ with open("x_test", "rb") as fp:   # Unpickling
 with open("y_test", "rb") as fp:   # Unpickling
     y_test = pickle.load(fp)
 
-
-""" EXTRAIRE DES FICHIERS WAV D'UNE CERTAINE LONGUEUR
-from pydub import AudioSegment
-t1 = t1 * 1000 #Works in milliseconds
-t2 = t2 * 1000
-newAudio = AudioSegment.from_wav("oldSong.wav")
-newAudio = newAudio[t1:t2]
-newAudio.export('newSong.wav', format="wav")"""
-
-"""checkpoint_path = "audio_model.keras"
+#print("x_train : ", len(x_train))
+#print("y_train : ", len(y_train))
+#print("x_test : ", len(x_test))
+#print("y_test : ", len(y_test))
+"""
+checkpoint_path = "audio_model.keras"
 
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     filepath=checkpoint_path,
@@ -204,46 +237,17 @@ model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     mode='min',
     save_best_only=True,
     verbose=1
-    hist = model.fit(x_train, y_train, batch_size=64, epochs=5, validation_split=0.2, callbacks=[model_checkpoint_callback])
-)"""
-
-new_x_test = []
-new_y_test = []
-print(len(x_test))
-print(len(x_test[0]))
-for i in tqdm(range(len(x_test))):
-    curr_list = x_test[i]
-    for elem in curr_list:
-        print(elem.shape)
-        new_x_test.append(elem)
-        new_y_test.append(y_test[i])
-
-x_test = new_x_test
-y_test = new_y_test
-
-
-for i in tqdm(range(len(x_train))):
-    x_train[i] = tf.convert_to_tensor(x_train[i], dtype=tf.float32)
-for i in tqdm(range(len(y_train))):
-    y_train[i] = tf.convert_to_tensor(y_train[i], dtype=tf.float32)
-for i in tqdm(range(len(x_test))):
-    x_test[i] = tf.convert_to_tensor(x_test[i], dtype=tf.float32)
-for i in tqdm(range(len(y_test))):
-    y_test[i] = tf.convert_to_tensor(y_test[i], dtype=tf.float32)
-
-
-hist = model.fit(np.array(x_train), np.array(y_train), batch_size=64, epochs=5)
-#Save model
-model.save("audio_model.keras")
-
+)
+hist = model.fit(x_train, y_train, batch_size=64, epochs=5, validation_split=0.2, callbacks=[model_checkpoint_callback])
+"""
 #Load model
 loaded = keras.models.load_model("audio_model.keras")
 
-score = loaded.evaluate(np.array(x_test), np.array(y_test), verbose=0)
+score = loaded.evaluate(x_test, y_test, verbose=0)
 print("Test loss : ", score[0])
 print("Test accuracy", score[1])
 plt.plot(hist.history['accuracy'])
-#plt.plot(hist.history['val_accuracy'])
+plt.plot(hist.history['val_accuracy'])
 plt.title('Model Accuracy')
 plt.ylabel('Accuracy')
 plt.xlabel('Epochs')
