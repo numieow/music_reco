@@ -1,14 +1,20 @@
+import time
 import numpy as np
 import librosa
 import keras
 import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.model_selection import GridSearchCV
 import tensorflow as tf
 from tqdm import tqdm
 import pickle
 #Skip Tensorflow warnings
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+#import KerasClassifier
+from scikeras.wrappers import KerasClassifier
+
 
 
 INSTRUMENTS_FULL_NAME = {
@@ -91,7 +97,7 @@ def spectro_extract(file):
     
     #get the mel-scaled spectrogram
     spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128,fmax=45000)
-    
+    spectrogram = librosa.power_to_db(spectrogram, ref=np.max)
     # Specshow the spectrogram
     # plt.figure(figsize=(10, 4))
     # librosa.display.specshow(librosa.power_to_db(spectrogram, ref=np.max), y_axis='mel', fmax=45000, x_axis='time')
@@ -99,7 +105,6 @@ def spectro_extract(file):
     # plt.title('Mel spectrogram')
     # plt.tight_layout()
     # plt.show()
-    
     return spectrogram
 
 #Take tracks as an input and output multiple tracks
@@ -120,13 +125,18 @@ def create_test_tracks(file_name):
     return total_spectres
 
 
-
 def one_hot_encode(y):
     for i in range(len(y)):
         y[i] = [1 if instr in y[i] else 0 for instr in INSTRUMENTS]
     return y
 
-model = keras.models.Sequential(
+
+
+def create_model():
+    """
+    Creates and returns a model
+    """
+    model = keras.models.Sequential(
     [
         keras.layers.Input(shape=(128, 130, 1)),
         keras.layers.Conv2D(16, (7, 7), activation='relu'),
@@ -145,15 +155,27 @@ model = keras.models.Sequential(
         keras.layers.Dropout(0.5),
         keras.layers.Dense(100, activation='relu'),
         keras.layers.Dropout(0.75),
+        keras.layers.Dense(30, activation='relu'),
+        keras.layers.Dropout(0.75),
         keras.layers.Dense(len(INSTRUMENTS_FULL_NAME), activation='softmax')
     ]
 )
 
-model.summary()
-optimizer = keras.optimizers.Adam(learning_rate=0.0001)
-model.compile(loss="categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
+    #model.summary()
+    optimizer = keras.optimizers.Adam(learning_rate=0.0001)
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    return model
+
+def display_cv_results(search_results):
+    print('Best score = {:.4f} using {}'.format(search_results.best_score_, search_results.best_params_))
+    means = search_results.cv_results_['mean_test_score']
+    stds = search_results.cv_results_['std_test_score']
+    params = search_results.cv_results_['params']
+    for mean, stdev, param in zip(means, stds, params):
+        print('mean test accuracy +/- std = {:.4f} +/- {:.4f} with: {}'.format(mean, stdev, param))   
 
 """
+print("### TRAIN DATA ###")
 train_df = pd.read_csv(train_data_path)
 train_track_names = pd.unique(train_df['Track Name'])
 
@@ -176,7 +198,7 @@ with open("x_train", "wb") as fp:   #Pickling
 with open("y_train", "wb") as fp:   #Pickling
     pickle.dump(y_train, fp)
 
-
+print("### TEST DATA ###")
 test_df = pd.read_csv(test_data_path)
 test_track_names = pd.unique(test_df['Track Name'])
 
@@ -191,25 +213,21 @@ for i in tqdm(range(len(y_test))):
 
 new_x_test = []
 new_y_test = []
+print("### REPLACEMENT ###")
 for i in tqdm(range(len(x_test))):
     curr_list = x_test[i]
     for elem in curr_list:
-        print(elem.shape)
         new_x_test.append(elem)
         new_y_test.append(y_test[i])
 
 x_test = np.array(new_x_test)
 y_test = np.array(new_y_test)
 
-print(len("x_test : "), x_test)
-print(len("y_test : "), y_test)
-
-
-
 with open("x_test", "wb") as fp:   #Pickling
     pickle.dump(x_test, fp)
 with open("y_test", "wb") as fp:   #Pickling
     pickle.dump(y_test, fp)
+
 """
 
 # explicit function to normalize array
@@ -238,7 +256,37 @@ with open("y_test", "rb") as fp:   # Unpickling
 #print("y_train : ", len(y_train))
 #print("x_test : ", len(x_test))
 #print("y_test : ", len(y_test))
+"""
+librosa.display.specshow(x_train[0], y_axis='mel', fmax=45000, x_axis='time')
+plt.colorbar(format='%+2.0f dB')
+plt.title('Mel spectrogram')
+plt.tight_layout()
+plt.show()"""
 
+
+#Start a timer
+start = time.time()
+
+# create model
+model = KerasClassifier(model=create_model, verbose=1)
+# define parameters and values for grid search 
+n_cv = 3
+n_epochs_cv = 10
+
+param_grid = {
+    'batch_size': [8, 16, 32, 64],
+    'epochs': [n_epochs_cv],
+    'validation_split': [0.1, 0.2, 0.3]
+}
+grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv)
+grid_result = grid.fit(x_train, y_train) 
+print('time for grid search = {:.0f} sec'.format(time.time()-start))
+display_cv_results(grid_result)
+
+
+"""
+# reload best model
+mlp = grid_result.best_estimator_ 
 checkpoint_path = "audio_model.keras"
 
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
@@ -248,7 +296,23 @@ model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     save_best_only=True,
     verbose=1
 )
-hist = model.fit(x_train, y_train, batch_size=64, epochs=5, validation_split=0.2, callbacks=[model_checkpoint_callback])
+# retrain best model on the full training set 
+history = mlp.fit(x_train, y_train, batch_size=16, epochs=10, validation_split=0.2, callbacks=[model_checkpoint_callback])
+"""
+
+
+
+"""
+checkpoint_path = "audio_model.keras"
+
+model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+    filepath=checkpoint_path,
+    monitor='val_loss',
+    mode='min',
+    save_best_only=True,
+    verbose=1
+)
+hist = model.fit(x_train, y_train, batch_size=16, epochs=10, validation_split=0.2, callbacks=[model_checkpoint_callback])
 
 #Load model
 loaded = keras.models.load_model("audio_model.keras")
@@ -269,4 +333,4 @@ plt.title('Model Loss')
 plt.ylabel('Loss')
 plt.xlabel('Epochs')
 plt.legend(['train', 'val'], loc='upper left')
-plt.show()
+plt.show()"""
