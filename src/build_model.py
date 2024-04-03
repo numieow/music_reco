@@ -10,7 +10,7 @@ from tqdm import tqdm
 import pickle
 #Skip Tensorflow warnings
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
 
 #import KerasClassifier
 from scikeras.wrappers import KerasClassifier
@@ -91,7 +91,7 @@ def spectro_extract(file):
     """
     Define function that takes in a file an returns features in an array
     """
-    
+    #TODO : spectro-extract renvoie une liste de 5 elements qui sont toujours le même avec du bruit en plus
     #get wave representation : y : waveform, s : sampling rate
     y, sr = librosa.load(file)
     
@@ -162,7 +162,7 @@ def create_model():
 )
 
     #model.summary()
-    optimizer = keras.optimizers.Adam(learning_rate=0.0001)
+    optimizer = keras.optimizers.Adam(learning_rate=0.00001)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     return model
 
@@ -174,6 +174,7 @@ def display_cv_results(search_results):
     for mean, stdev, param in zip(means, stds, params):
         print('mean test accuracy +/- std = {:.4f} +/- {:.4f} with: {}'.format(mean, stdev, param))   
 
+#TODO : gérer la future prochaine forme de spectro-extract (qui renverra une liste et plus un élément unique)
 """
 print("### TRAIN DATA ###")
 train_df = pd.read_csv(train_data_path)
@@ -230,15 +231,18 @@ with open("y_test", "wb") as fp:   #Pickling
 
 """
 
+"""
 # explicit function to normalize array
 def normalize_2d(matrix):
     norm = np.linalg.norm(matrix)
     matrix = matrix/norm  # normalized matrix
     return matrix
 
+samples_shape = (128, 130)
+
 with open("x_train", "rb") as fp:   # Unpickling
     x_train = pickle.load(fp)
-    for i in range(len(x_train)):
+    for i in tqdm(range(len(x_train))):
         x_train[i] = normalize_2d(x_train[i])
 
 with open("y_train", "rb") as fp:   # Unpickling
@@ -246,16 +250,15 @@ with open("y_train", "rb") as fp:   # Unpickling
 
 with open("x_test", "rb") as fp:   # Unpickling
     x_test = pickle.load(fp)
-    for i in range(len(x_test)):
+    for i in tqdm(range(len(x_test))):
         x_test[i] = normalize_2d(x_test[i])
     
 with open("y_test", "rb") as fp:   # Unpickling
     y_test = pickle.load(fp)
+"""
 
-#print("x_train : ", len(x_train))
-#print("y_train : ", len(y_train))
-#print("x_test : ", len(x_test))
-#print("y_test : ", len(y_test))
+
+
 """
 librosa.display.specshow(x_train[0], y_axis='mel', fmax=45000, x_axis='time')
 plt.colorbar(format='%+2.0f dB')
@@ -263,7 +266,7 @@ plt.title('Mel spectrogram')
 plt.tight_layout()
 plt.show()"""
 
-
+"""
 #Start a timer
 start = time.time()
 
@@ -271,18 +274,18 @@ start = time.time()
 model = KerasClassifier(model=create_model, verbose=1)
 # define parameters and values for grid search 
 n_cv = 3
-n_epochs_cv = 10
+n_epochs_cv = 50
 
 param_grid = {
-    'batch_size': [8, 16, 32, 64],
+    'batch_size': [8, 10, 16, 25, 32, 64],
     'epochs': [n_epochs_cv],
-    'validation_split': [0.1, 0.2, 0.3]
+    'validation_split': [0.1, 0.15, 0.2, 0.25, 0.3]
 }
-grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv)
+grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv, error_score='raise')
 grid_result = grid.fit(x_train, y_train) 
 print('time for grid search = {:.0f} sec'.format(time.time()-start))
 display_cv_results(grid_result)
-
+"""
 
 """
 # reload best model
