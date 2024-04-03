@@ -8,6 +8,7 @@ from sklearn.model_selection import GridSearchCV
 import tensorflow as tf
 from tqdm import tqdm
 import pickle
+import cv2
 #Skip Tensorflow warnings
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
@@ -87,6 +88,7 @@ def feature_extract(file):
     
     return [harmonic, mfcc, spectrogram, chroma, contrast]
 
+
 def spectro_extract(file):
     """
     Define function that takes in a file an returns features in an array
@@ -105,7 +107,13 @@ def spectro_extract(file):
     # plt.title('Mel spectrogram')
     # plt.tight_layout()
     # plt.show()
-    return spectrogram
+
+    spectrogram_duplicated = spectrogram.copy()
+    # np.random.normal(mean, std, output_shape)
+    noise = np.random.normal(0, 25, spectrogram_duplicated.shape).astype(np.uint8)
+    noisy_spectrogram = cv2.add(spectrogram_duplicated, noise)
+
+    return list(spectrogram, noisy_spectrogram)
 
 #Take tracks as an input and output multiple tracks
 def create_test_tracks(file_name):
