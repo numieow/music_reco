@@ -6,12 +6,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import GridSearchCV
 import tensorflow as tf
+from keras.preprocessing import image
+from PIL import Image
 from tqdm import tqdm
 import pickle
-import cv2
 #Skip Tensorflow warnings
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 #import KerasClassifier
 from scikeras.wrappers import KerasClassifier
@@ -32,7 +34,7 @@ INSTRUMENTS_FULL_NAME = {
     'voi':'vocals'
 }
 INSTRUMENTS = list(INSTRUMENTS_FULL_NAME.keys())
-TEST_LENGTH = 20
+TEST_LENGTH = 500
 
 base_path = '../data/'
 test_data_path = base_path + 'test_data.csv'
@@ -108,12 +110,19 @@ def spectro_extract(file):
     # plt.tight_layout()
     # plt.show()
 
-    spectrogram_duplicated = spectrogram.copy()
+    # spectrogram_duplicated = spectrogram.copy()
     # np.random.normal(mean, std, output_shape)
-    noise = np.random.normal(0, 25, spectrogram_duplicated.shape).astype(np.uint8)
-    noisy_spectrogram = cv2.add(spectrogram_duplicated, noise)
+    # noise = np.random.normal(0, 25, spectrogram_duplicated.shape).astype(np.uint8)
+    # noisy_spectrogram = cv2.add(spectrogram_duplicated, noise)
+    plt.figure()
+    librosa.display.specshow(spectrogram, fmax=45000)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig('temp.png')
+    plt.close()
+    image_pil = Image.open('temp.png')
 
-    return list(spectrogram, noisy_spectrogram)
+    return image.img_to_array(image_pil)
 
 #Take tracks as an input and output multiple tracks
 def create_test_tracks(file_name):
@@ -146,7 +155,7 @@ def create_model():
     """
     model = keras.models.Sequential(
     [
-        keras.layers.Input(shape=(128, 130, 1)),
+        keras.layers.Input(shape=(480, 640, 4)),
         keras.layers.Conv2D(16, (7, 7), activation='relu'),
         keras.layers.Conv2D(32, (5, 5), activation='relu'),
         keras.layers.MaxPooling2D(),
@@ -183,17 +192,18 @@ def display_cv_results(search_results):
         print('mean test accuracy +/- std = {:.4f} +/- {:.4f} with: {}'.format(mean, stdev, param))   
 
 #TODO : gérer la future prochaine forme de spectro-extract (qui renverra une liste et plus un élément unique)
+
 """
 print("### TRAIN DATA ###")
 train_df = pd.read_csv(train_data_path)
 train_track_names = pd.unique(train_df['Track Name'])
 
-x_train = [spectro_extract('../data/' + file) for file in tqdm(train_track_names)]
+x_train = [spectro_extract('../data/' + file) for file in tqdm(train_track_names[:TEST_LENGTH])]
 
 for i in tqdm(range(len(x_train))):
     x_train[i] = tf.convert_to_tensor(x_train[i], dtype=tf.float32)
 
-y_train = [train_df[train_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(train_track_names)]
+y_train = [train_df[train_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(train_track_names[:TEST_LENGTH])]
 y_train = one_hot_encode(y_train)
 
 for i in tqdm(range(len(y_train))):
@@ -202,20 +212,22 @@ for i in tqdm(range(len(y_train))):
 x_train = np.array(x_train)
 y_train = np.array(y_train)
 
+
 with open("x_train", "wb") as fp:   #Pickling
     pickle.dump(x_train, fp)
 with open("y_train", "wb") as fp:   #Pickling
     pickle.dump(y_train, fp)
 
+
 print("### TEST DATA ###")
 test_df = pd.read_csv(test_data_path)
 test_track_names = pd.unique(test_df['Track Name'])
 
-x_test = [create_test_tracks('../data/' + file + '.wav') for file in tqdm(test_track_names)]
+x_test = [create_test_tracks('../data/' + file + '.wav') for file in tqdm(test_track_names[:TEST_LENGTH//2])]
 for i in tqdm(range(len(x_test))):
     x_test[i] = tf.convert_to_tensor(x_test[i], dtype=tf.float32)
 
-y_test = [test_df[test_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(test_track_names)]
+y_test = [test_df[test_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(test_track_names[:TEST_LENGTH//2])]
 y_test = one_hot_encode(y_test)
 for i in tqdm(range(len(y_test))):
     y_test[i] = tf.convert_to_tensor(y_test[i], dtype=tf.float32)
@@ -236,10 +248,10 @@ with open("x_test", "wb") as fp:   #Pickling
     pickle.dump(x_test, fp)
 with open("y_test", "wb") as fp:   #Pickling
     pickle.dump(y_test, fp)
-
 """
 
-"""
+
+
 # explicit function to normalize array
 def normalize_2d(matrix):
     norm = np.linalg.norm(matrix)
@@ -251,19 +263,32 @@ samples_shape = (128, 130)
 with open("x_train", "rb") as fp:   # Unpickling
     x_train = pickle.load(fp)
     for i in tqdm(range(len(x_train))):
-        x_train[i] = normalize_2d(x_train[i])
+        x_train[i] = x_train[i] / 255.0
+#     for i in tqdm(range(len(x_train))):
+#         x_train[i] = normalize_2d(x_train[i])
+
+
+
+'''
+print(type(x_train))
+print(type(x_train[0]))
+print(x_train[0].shape)
+print(x_train[1].shape)
+print(x_train[2].shape)
+plt.imshow(x_train[0])
+plt.axis('off')
+plt.show()'''
 
 with open("y_train", "rb") as fp:   # Unpickling
     y_train = pickle.load(fp)
 
 with open("x_test", "rb") as fp:   # Unpickling
     x_test = pickle.load(fp)
-    for i in tqdm(range(len(x_test))):
-        x_test[i] = normalize_2d(x_test[i])
+    for i in tqdm(range(len(x_train))):
+        x_train[i] = x_train[i] / 255.0
     
 with open("y_test", "rb") as fp:   # Unpickling
     y_test = pickle.load(fp)
-"""
 
 
 
@@ -274,7 +299,7 @@ plt.title('Mel spectrogram')
 plt.tight_layout()
 plt.show()"""
 
-"""
+
 #Start a timer
 start = time.time()
 
@@ -282,18 +307,36 @@ start = time.time()
 model = KerasClassifier(model=create_model, verbose=1)
 # define parameters and values for grid search 
 n_cv = 3
-n_epochs_cv = 50
+n_epochs_cv = 10
 
 param_grid = {
-    'batch_size': [8, 10, 16, 25, 32, 64],
+    'batch_size': [8],
     'epochs': [n_epochs_cv],
-    'validation_split': [0.1, 0.15, 0.2, 0.25, 0.3]
+    'validation_split': [0.1]
 }
+perfs = []
+
+#manually train the model with each parameter combination
+for batch_size in param_grid['batch_size']:
+    for validation_split in param_grid['validation_split']:
+        model.fit(x_train[:200], y_train[:200], batch_size=batch_size, epochs=n_epochs_cv, validation_split=validation_split)
+        #Clear session
+        keras.backend.clear_session()
+        #Save performance metrics as (batch_size, validation_split, mean_test_score))
+        print('batch_size = {}, validation_split = {}, last_accuracy = {:.4f}'.format(batch_size, validation_split, model.history_['accuracy'][-1]))
+        perfs.append((batch_size, validation_split, model.history_['accuracy'][-1]))
+
+print('Time for manual search = {:.0f} sec'.format(time.time()-start))
+print(perfs)
+
+
+
+'''
 grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv, error_score='raise')
-grid_result = grid.fit(x_train, y_train) 
+grid_result = grid.fit(x_train[:200], y_train[:200]) 
 print('time for grid search = {:.0f} sec'.format(time.time()-start))
-display_cv_results(grid_result)
-"""
+display_cv_results(grid_result)'''
+
 
 """
 # reload best model
@@ -345,3 +388,7 @@ plt.ylabel('Loss')
 plt.xlabel('Epochs')
 plt.legend(['train', 'val'], loc='upper left')
 plt.show()"""
+
+
+#model = create_model()
+#model.fit(x_train, y_train, batch_size=1, epochs=10, validation_split=0.2)
