@@ -1,0 +1,4 @@
+./src/x*
+./src/y*
+./src/temp.png
+./test.py
