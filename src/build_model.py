@@ -174,7 +174,7 @@ def create_model():
         keras.layers.Dropout(0.75),
         keras.layers.Dense(30, activation='relu'),
         keras.layers.Dropout(0.75),
-        keras.layers.Dense(len(INSTRUMENTS_FULL_NAME), activation='softmax')
+        keras.layers.Dense(len(INSTRUMENTS_FULL_NAME), activation='sigmoid')
     ]
 )
 
