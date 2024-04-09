@@ -161,8 +161,8 @@ def create_model():
         keras.layers.MaxPooling2D(),
         keras.layers.Dropout(0.25),
         keras.layers.Conv2D(64, (3, 3), activation='relu'),
-        keras.layers.MaxPooling2D(),
-        keras.layers.Conv2D(128, (3, 3), activation='relu'),
+        #keras.layers.MaxPooling2D(),
+        #keras.layers.Conv2D(128, (3, 3), activation='relu'),
         keras.layers.MaxPooling2D(),
         keras.layers.Dropout(0.5),
         keras.layers.Conv2D(256, (3, 3), activation='relu'),
@@ -179,6 +179,28 @@ def create_model():
 )
 
     #model.summary()
+    optimizer = keras.optimizers.Adam(learning_rate=0.00001)
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    return model
+
+def create_optimal_model():
+    model = keras.models.Sequential(
+        [
+            keras.layers.Input(shape=(480, 640, 4)),
+            keras.layers.Conv2D(32, (3, 3), activation='relu'),
+            keras.layers.MaxPooling2D(),
+            keras.layers.Conv2D(128, (3, 3), activation='relu'),
+            keras.layers.MaxPooling2D(),
+            keras.layers.Conv2D(128, (3, 3), activation='relu'),
+            keras.layers.MaxPooling2D(),
+            keras.layers.Conv2D(128, (3, 3), activation='relu'),
+            keras.layers.MaxPooling2D(),
+            keras.layers.Flatten(),
+            keras.layers.Dense(1024, activation='relu'),
+            keras.layers.Dense(len(INSTRUMENTS_FULL_NAME), activation='sigmoid')
+        ]
+    )
+
     optimizer = keras.optimizers.Adam(learning_rate=0.00001)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     return model
@@ -304,7 +326,7 @@ plt.show()"""
 start = time.time()
 
 # create model
-model = KerasClassifier(model=create_model, verbose=1)
+model = KerasClassifier(model=create_optimal_model, verbose=1)
 # define parameters and values for grid search 
 n_cv = 3
 n_epochs_cv = 10
@@ -312,14 +334,14 @@ n_epochs_cv = 10
 param_grid = {
     'batch_size': [8],
     'epochs': [n_epochs_cv],
-    'validation_split': [0.1]
+    'validation_split': [0.1, 0.2]
 }
 perfs = []
 
 #manually train the model with each parameter combination
 for batch_size in param_grid['batch_size']:
     for validation_split in param_grid['validation_split']:
-        model.fit(x_train[:200], y_train[:200], batch_size=batch_size, epochs=n_epochs_cv, validation_split=validation_split)
+        model.fit(x_train, y_train, batch_size=batch_size, epochs=n_epochs_cv, validation_split=validation_split)
         #Clear session
         keras.backend.clear_session()
         #Save performance metrics as (batch_size, validation_split, mean_test_score))
