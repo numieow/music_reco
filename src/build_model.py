@@ -98,31 +98,56 @@ def spectro_extract(file):
     #TODO : spectro-extract renvoie une liste de 5 elements qui sont toujours le même avec du bruit en plus
     #get wave representation : y : waveform, s : sampling rate
     y, sr = librosa.load(file)
+    n_mels = 128
     
     #get the mel-scaled spectrogram
-    spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128,fmax=45000)
+    spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels,fmax=11250)
     spectrogram = librosa.power_to_db(spectrogram, ref=np.max)
+
     # Specshow the spectrogram
-    # plt.figure(figsize=(10, 4))
-    # librosa.display.specshow(librosa.power_to_db(spectrogram, ref=np.max), y_axis='mel', fmax=45000, x_axis='time')
-    # plt.colorbar(format='%+2.0f dB')
-    # plt.title('Mel spectrogram')
-    # plt.tight_layout()
-    # plt.show()
+    #plt.figure(figsize=(10, 4))
+    #librosa.display.specshow(spectrogram, y_axis='mel', fmax=45000, x_axis='time')
+    #plt.colorbar(format='%+2.0f dB')
+    #plt.title('Mel spectrogram - BEFORE')
+    #plt.tight_layout()
+    #plt.show()
+
+    #Normalise the spectrogram by bands of 4 lines
+    for i in range(0, n_mels, 4):
+        min = np.min(spectrogram[i:i+4])
+        max = np.max(spectrogram[i:i+4])
+        if max - min != 0:
+            spectrogram[i:i+4] = (spectrogram[i:i+4] - min) / (max - min)
+        else:
+            spectrogram[i:i+4] = spectrogram[i:i+4] - min
+
+    # Specshow the spectrogram
+    #plt.figure(figsize=(10, 4))
+    #librosa.display.specshow(spectrogram, y_axis='mel', fmax=11250, x_axis='time')
+    #plt.colorbar(format='%+2.0f dB')
+    #plt.title('Mel spectrogram - AFTER')
+    #plt.tight_layout()
+    #plt.show()
 
     # spectrogram_duplicated = spectrogram.copy()
     # np.random.normal(mean, std, output_shape)
     # noise = np.random.normal(0, 25, spectrogram_duplicated.shape).astype(np.uint8)
     # noisy_spectrogram = cv2.add(spectrogram_duplicated, noise)
-    plt.figure()
-    librosa.display.specshow(spectrogram, fmax=45000)
-    plt.axis('off')
-    plt.tight_layout()
-    plt.savefig('temp.png')
-    plt.close()
-    image_pil = Image.open('temp.png')
+    # plt.figure()
+    # librosa.display.specshow(spectrogram, fmax=45000)
+    # plt.axis('off')
+    # plt.tight_layout()
+    # plt.savefig('temp.png')
+    # plt.close()
+    # image_pil = Image.open('temp.png')
+    #return image.img_to_array(image_pil)
 
-    return image.img_to_array(image_pil)
+    return spectrogram
+
+train_df = pd.read_csv(train_data_path)
+train_track_names = pd.unique(train_df['Track Name'])
+oui = spectro_extract('../data/' + train_track_names[0])
+print(oui.shape)
 
 #Take tracks as an input and output multiple tracks
 def create_test_tracks(file_name):
@@ -141,13 +166,10 @@ def create_test_tracks(file_name):
 
     return total_spectres
 
-
 def one_hot_encode(y):
     for i in range(len(y)):
         y[i] = [1 if instr in y[i] else 0 for instr in INSTRUMENTS]
     return y
-
-
 
 def create_model():
     """
@@ -155,14 +177,14 @@ def create_model():
     """
     model = keras.models.Sequential(
     [
-        keras.layers.Input(shape=(480, 640, 4)),
+        keras.layers.Input(shape=(128, 130, 1)),
         keras.layers.Conv2D(16, (7, 7), activation='relu'),
         keras.layers.Conv2D(32, (5, 5), activation='relu'),
         keras.layers.MaxPooling2D(),
         keras.layers.Dropout(0.25),
         keras.layers.Conv2D(64, (3, 3), activation='relu'),
-        #keras.layers.MaxPooling2D(),
-        #keras.layers.Conv2D(128, (3, 3), activation='relu'),
+        keras.layers.MaxPooling2D(),
+        keras.layers.Conv2D(128, (3, 3), activation='relu'),
         keras.layers.MaxPooling2D(),
         keras.layers.Dropout(0.5),
         keras.layers.Conv2D(256, (3, 3), activation='relu'),
@@ -186,7 +208,7 @@ def create_model():
 def create_optimal_model():
     model = keras.models.Sequential(
         [
-            keras.layers.Input(shape=(480, 640, 4)),
+            keras.layers.Input(shape=(128, 130, 1)),
             keras.layers.Conv2D(32, (3, 3), activation='relu'),
             keras.layers.MaxPooling2D(),
             keras.layers.Conv2D(128, (3, 3), activation='relu'),
@@ -196,7 +218,7 @@ def create_optimal_model():
             keras.layers.Conv2D(128, (3, 3), activation='relu'),
             keras.layers.MaxPooling2D(),
             keras.layers.Flatten(),
-            keras.layers.Dense(1024, activation='relu'),
+            keras.layers.Dense(256, activation='relu'),
             keras.layers.Dense(len(INSTRUMENTS_FULL_NAME), activation='sigmoid')
         ]
     )
@@ -213,19 +235,24 @@ def display_cv_results(search_results):
     for mean, stdev, param in zip(means, stds, params):
         print('mean test accuracy +/- std = {:.4f} +/- {:.4f} with: {}'.format(mean, stdev, param))   
 
+# explicit function to normalize array
+def normalize_2d(matrix):
+    norm = np.linalg.norm(matrix)
+    matrix = matrix/norm  # normalized matrix
+    return matrix
 #TODO : gérer la future prochaine forme de spectro-extract (qui renverra une liste et plus un élément unique)
 
-"""
-print("### TRAIN DATA ###")
+
+"""print("### TRAIN DATA ###")
 train_df = pd.read_csv(train_data_path)
 train_track_names = pd.unique(train_df['Track Name'])
 
-x_train = [spectro_extract('../data/' + file) for file in tqdm(train_track_names[:TEST_LENGTH])]
+x_train = [spectro_extract('../data/' + file) for file in tqdm(train_track_names)]
 
 for i in tqdm(range(len(x_train))):
     x_train[i] = tf.convert_to_tensor(x_train[i], dtype=tf.float32)
 
-y_train = [train_df[train_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(train_track_names[:TEST_LENGTH])]
+y_train = [train_df[train_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(train_track_names)]
 y_train = one_hot_encode(y_train)
 
 for i in tqdm(range(len(y_train))):
@@ -235,9 +262,9 @@ x_train = np.array(x_train)
 y_train = np.array(y_train)
 
 
-with open("x_train", "wb") as fp:   #Pickling
+with open("x_train_norm", "wb") as fp:   #Pickling
     pickle.dump(x_train, fp)
-with open("y_train", "wb") as fp:   #Pickling
+with open("y_train_norm", "wb") as fp:   #Pickling
     pickle.dump(y_train, fp)
 
 
@@ -245,11 +272,11 @@ print("### TEST DATA ###")
 test_df = pd.read_csv(test_data_path)
 test_track_names = pd.unique(test_df['Track Name'])
 
-x_test = [create_test_tracks('../data/' + file + '.wav') for file in tqdm(test_track_names[:TEST_LENGTH//2])]
+x_test = [create_test_tracks('../data/' + file + '.wav') for file in tqdm(test_track_names)]
 for i in tqdm(range(len(x_test))):
     x_test[i] = tf.convert_to_tensor(x_test[i], dtype=tf.float32)
 
-y_test = [test_df[test_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(test_track_names[:TEST_LENGTH//2])]
+y_test = [test_df[test_df['Track Name'] == name]['Instrument'].values.tolist() for name in tqdm(test_track_names)]
 y_test = one_hot_encode(y_test)
 for i in tqdm(range(len(y_test))):
     y_test[i] = tf.convert_to_tensor(y_test[i], dtype=tf.float32)
@@ -266,29 +293,44 @@ for i in tqdm(range(len(x_test))):
 x_test = np.array(new_x_test)
 y_test = np.array(new_y_test)
 
-with open("x_test", "wb") as fp:   #Pickling
+with open("x_test_norm", "wb") as fp:   #Pickling
     pickle.dump(x_test, fp)
-with open("y_test", "wb") as fp:   #Pickling
-    pickle.dump(y_test, fp)
-"""
+with open("y_test_norm", "wb") as fp:   #Pickling
+    pickle.dump(y_test, fp)"""
 
 
 
-# explicit function to normalize array
-def normalize_2d(matrix):
-    norm = np.linalg.norm(matrix)
-    matrix = matrix/norm  # normalized matrix
-    return matrix
+
 
 samples_shape = (128, 130)
 
-with open("x_train", "rb") as fp:   # Unpickling
+with open("x_train_norm", "rb") as fp:   # Unpickling
     x_train = pickle.load(fp)
-    for i in tqdm(range(len(x_train))):
-        x_train[i] = x_train[i] / 255.0
+#     for i in tqdm(range(len(x_train))):
+#         x_train[i] = x_train[i] / 255.0
 #     for i in tqdm(range(len(x_train))):
 #         x_train[i] = normalize_2d(x_train[i])
 
+with open("y_train_norm", "rb") as fp:   # Unpickling
+    y_train = pickle.load(fp)
+
+with open("x_test_norm", "rb") as fp:   # Unpickling
+    x_test = pickle.load(fp)
+#    for i in tqdm(range(len(x_train))):
+#        x_train[i] = x_train[i] / 255.0
+    
+with open("y_test_norm", "rb") as fp:   # Unpickling
+    y_test = pickle.load(fp)
+
+# Specshow the spectrogram
+plt.figure(figsize=(10, 4))
+librosa.display.specshow(x_train[0], y_axis='mel', fmax=11250, x_axis='time')
+plt.colorbar(format='%+2.0f dB')
+plt.title('Mel spectrogram')
+plt.tight_layout()
+plt.show()
+
+print(x_train[0])
 
 
 '''
@@ -301,21 +343,10 @@ plt.imshow(x_train[0])
 plt.axis('off')
 plt.show()'''
 
-with open("y_train", "rb") as fp:   # Unpickling
-    y_train = pickle.load(fp)
-
-with open("x_test", "rb") as fp:   # Unpickling
-    x_test = pickle.load(fp)
-    for i in tqdm(range(len(x_train))):
-        x_train[i] = x_train[i] / 255.0
-    
-with open("y_test", "rb") as fp:   # Unpickling
-    y_test = pickle.load(fp)
 
 
 
-"""
-librosa.display.specshow(x_train[0], y_axis='mel', fmax=45000, x_axis='time')
+"""librosa.display.specshow(x_train[0], y_axis='mel', fmax=45000, x_axis='time')
 plt.colorbar(format='%+2.0f dB')
 plt.title('Mel spectrogram')
 plt.tight_layout()
@@ -326,16 +357,25 @@ plt.show()"""
 start = time.time()
 
 # create model
-model = KerasClassifier(model=create_optimal_model, verbose=1)
+model = KerasClassifier(model=create_model, verbose=1)
 # define parameters and values for grid search 
 n_cv = 3
 n_epochs_cv = 10
 
 param_grid = {
-    'batch_size': [8],
+    'batch_size': [8, 10, 20, 30],
     'epochs': [n_epochs_cv],
-    'validation_split': [0.1, 0.2]
+    'validation_split': [.15, 0.2, 0.25]
 }
+
+#grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv, error_score='raise')
+#grid_result = grid.fit(x_train, y_train) 
+#print('time for grid search = {:.0f} sec'.format(time.time()-start))
+#display_cv_results(grid_result)
+
+#model.fit(x_train, y_train, batch_size=128, epochs=500, validation_split=0.25)
+
+'''
 perfs = []
 
 #manually train the model with each parameter combination
@@ -349,15 +389,7 @@ for batch_size in param_grid['batch_size']:
         perfs.append((batch_size, validation_split, model.history_['accuracy'][-1]))
 
 print('Time for manual search = {:.0f} sec'.format(time.time()-start))
-print(perfs)
-
-
-
-'''
-grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv, error_score='raise')
-grid_result = grid.fit(x_train[:200], y_train[:200]) 
-print('time for grid search = {:.0f} sec'.format(time.time()-start))
-display_cv_results(grid_result)'''
+print(perfs)'''
 
 
 """
