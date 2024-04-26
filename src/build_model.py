@@ -4,6 +4,7 @@ import librosa
 import keras
 import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.discriminant_analysis import StandardScaler
 from sklearn.model_selection import GridSearchCV
 import tensorflow as tf
 from keras.preprocessing import image
@@ -114,20 +115,8 @@ def spectro_extract(file):
 
     #Normalise the spectrogram by bands of 4 lines
     for i in range(0, n_mels, 4):
-        min = np.min(spectrogram[i:i+4])
-        max = np.max(spectrogram[i:i+4])
-        if max - min != 0:
-            spectrogram[i:i+4] = (spectrogram[i:i+4] - min) / (max - min)
-        else:
-            spectrogram[i:i+4] = spectrogram[i:i+4] - min
-
-    # Specshow the spectrogram
-    #plt.figure(figsize=(10, 4))
-    #librosa.display.specshow(spectrogram, y_axis='mel', fmax=11250, x_axis='time')
-    #plt.colorbar(format='%+2.0f dB')
-    #plt.title('Mel spectrogram - AFTER')
-    #plt.tight_layout()
-    #plt.show()
+        scaler = StandardScaler()
+        spectrogram[i:i+4] = scaler.fit_transform(spectrogram[i:i+4])
 
     # spectrogram_duplicated = spectrogram.copy()
     # np.random.normal(mean, std, output_shape)
@@ -144,10 +133,10 @@ def spectro_extract(file):
 
     return spectrogram
 
-train_df = pd.read_csv(train_data_path)
-train_track_names = pd.unique(train_df['Track Name'])
-oui = spectro_extract('../data/' + train_track_names[0])
-print(oui.shape)
+#train_df = pd.read_csv(train_data_path)
+#train_track_names = pd.unique(train_df['Track Name'])
+#oui = spectro_extract('../data/' + train_track_names[0])
+#print(oui.shape)
 
 #Take tracks as an input and output multiple tracks
 def create_test_tracks(file_name):
@@ -233,14 +222,15 @@ def display_cv_results(search_results):
     stds = search_results.cv_results_['std_test_score']
     params = search_results.cv_results_['params']
     for mean, stdev, param in zip(means, stds, params):
-        print('mean test accuracy +/- std = {:.4f} +/- {:.4f} with: {}'.format(mean, stdev, param))   
+        print('mean test accuracy +/- std = {:.4f} +/- {:.4f} with: {}'.format(mean, stdev, param))  
+        # print keys of the cv_results_ dictionary
+        print(search_results.cv_results_.keys())
 
 # explicit function to normalize array
 def normalize_2d(matrix):
     norm = np.linalg.norm(matrix)
     matrix = matrix/norm  # normalized matrix
     return matrix
-#TODO : gérer la future prochaine forme de spectro-extract (qui renverra une liste et plus un élément unique)
 
 
 """print("### TRAIN DATA ###")
@@ -298,55 +288,23 @@ with open("x_test_norm", "wb") as fp:   #Pickling
 with open("y_test_norm", "wb") as fp:   #Pickling
     pickle.dump(y_test, fp)"""
 
-
-
-
-
-samples_shape = (128, 130)
-
+# Retrieve data
 with open("x_train_norm", "rb") as fp:   # Unpickling
     x_train = pickle.load(fp)
-#     for i in tqdm(range(len(x_train))):
-#         x_train[i] = x_train[i] / 255.0
-#     for i in tqdm(range(len(x_train))):
-#         x_train[i] = normalize_2d(x_train[i])
 
 with open("y_train_norm", "rb") as fp:   # Unpickling
     y_train = pickle.load(fp)
 
 with open("x_test_norm", "rb") as fp:   # Unpickling
     x_test = pickle.load(fp)
-#    for i in tqdm(range(len(x_train))):
-#        x_train[i] = x_train[i] / 255.0
     
 with open("y_test_norm", "rb") as fp:   # Unpickling
     y_test = pickle.load(fp)
 
-# Specshow the spectrogram
+"""
+# Snippet to show a spectrogram 
 plt.figure(figsize=(10, 4))
 librosa.display.specshow(x_train[0], y_axis='mel', fmax=11250, x_axis='time')
-plt.colorbar(format='%+2.0f dB')
-plt.title('Mel spectrogram')
-plt.tight_layout()
-plt.show()
-
-print(x_train[0])
-
-
-'''
-print(type(x_train))
-print(type(x_train[0]))
-print(x_train[0].shape)
-print(x_train[1].shape)
-print(x_train[2].shape)
-plt.imshow(x_train[0])
-plt.axis('off')
-plt.show()'''
-
-
-
-
-"""librosa.display.specshow(x_train[0], y_axis='mel', fmax=45000, x_axis='time')
 plt.colorbar(format='%+2.0f dB')
 plt.title('Mel spectrogram')
 plt.tight_layout()
@@ -360,36 +318,19 @@ start = time.time()
 model = KerasClassifier(model=create_model, verbose=1)
 # define parameters and values for grid search 
 n_cv = 3
-n_epochs_cv = 10
+n_epochs_cv = 50
 
 param_grid = {
-    'batch_size': [8, 10, 20, 30],
+    'batch_size': [8, 16, 32, 64],
     'epochs': [n_epochs_cv],
-    'validation_split': [.15, 0.2, 0.25]
+    'validation_split': [0.1, 0.2, 0.3, 0.4, 0.5]
 }
 
-#grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv, error_score='raise')
-#grid_result = grid.fit(x_train, y_train) 
-#print('time for grid search = {:.0f} sec'.format(time.time()-start))
-#display_cv_results(grid_result)
-
-#model.fit(x_train, y_train, batch_size=128, epochs=500, validation_split=0.25)
-
-'''
-perfs = []
-
-#manually train the model with each parameter combination
-for batch_size in param_grid['batch_size']:
-    for validation_split in param_grid['validation_split']:
-        model.fit(x_train, y_train, batch_size=batch_size, epochs=n_epochs_cv, validation_split=validation_split)
-        #Clear session
-        keras.backend.clear_session()
-        #Save performance metrics as (batch_size, validation_split, mean_test_score))
-        print('batch_size = {}, validation_split = {}, last_accuracy = {:.4f}'.format(batch_size, validation_split, model.history_['accuracy'][-1]))
-        perfs.append((batch_size, validation_split, model.history_['accuracy'][-1]))
-
-print('Time for manual search = {:.0f} sec'.format(time.time()-start))
-print(perfs)'''
+"""
+grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=1, cv=n_cv, error_score='raise')
+grid_result = grid.fit(x_train, y_train) 
+print('time for grid search = {:.0f} sec'.format(time.time()-start))
+display_cv_results(grid_result)"""
 
 
 """
@@ -410,7 +351,6 @@ history = mlp.fit(x_train, y_train, batch_size=16, epochs=10, validation_split=0
 
 
 
-"""
 checkpoint_path = "audio_model.keras"
 
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
@@ -420,7 +360,12 @@ model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     save_best_only=True,
     verbose=1
 )
-hist = model.fit(x_train, y_train, batch_size=16, epochs=10, validation_split=0.2, callbacks=[model_checkpoint_callback])
+
+model = create_model()
+print(model.summary())
+
+#Params "optimaux" : bs 32, epochs 100, validation_split 0.3
+hist = model.fit(x_train, y_train, batch_size=8, epochs=150, validation_split=0.4, callbacks=[model_checkpoint_callback])
 
 #Load model
 loaded = keras.models.load_model("audio_model.keras")
@@ -441,8 +386,4 @@ plt.title('Model Loss')
 plt.ylabel('Loss')
 plt.xlabel('Epochs')
 plt.legend(['train', 'val'], loc='upper left')
-plt.show()"""
-
-
-#model = create_model()
-#model.fit(x_train, y_train, batch_size=1, epochs=10, validation_split=0.2)
+plt.show()
