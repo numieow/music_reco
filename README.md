@@ -2,6 +2,8 @@
 
 Teammate : [Alexandre Radin](https://github.com/AlexandreR4)
 
+Dataset utilisé : [IRMAS](https://www.upf.edu/web/mtg/irmas)
+
 ### Les étapes souhaitées
 
 - Générer un csv avec la correspondance entre les instruments et les pistes audio.
