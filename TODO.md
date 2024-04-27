@@ -1,4 +1,4 @@
-### Étape 1 
+### Les étapes souhaitées
 
 - Générer un csv avec la correspondance entre les instruments et les pistes audio.
   - On crée une ligne par couple (piste, instrument), et on pourra les récupérer facilement sous forme de dataframe.

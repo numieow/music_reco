@@ -9,12 +9,22 @@ import numpy as np
 import librosa
 import tqdm
 
+# The file paths to retrieve the correct data in the following code
 TEST_PATHS = ['Test/Part1/', 'Test/Part2/', 'Test/Part3/']
 TRAIN_SUBFILES = ['cel', 'cla', 'flu', 'gac', 'gel', 'org', 'pia', 'sax', 'tru', 'vio', 'voi']
 TRAIN_PATHS = ['Train' + '/' + subfile + '/' for subfile in TRAIN_SUBFILES]
 
 def build_test_csv(folder_paths, csv_file_name):
+    """
+    Builds the csv file for the test data, keeping only the relevant information for our case study = the track name, the instruments and the duration.
 
+    Input : 
+        - folder_paths : list(string), the list of all file paths to go through while building the csv file
+        - csv_file_name : string, the name of the file to create
+
+    Output 
+        - df : DataFrame, the dataframe of the csv just created
+    """
     # Get the list of files in the folders
     files = [os.listdir(folder_path) for folder_path in folder_paths]
 
@@ -44,6 +54,17 @@ def build_test_csv(folder_paths, csv_file_name):
     return df
 
 def build_train_csv(folder_paths, csv_file_name):
+    """
+    Builds the csv file for the training data, keeping only the relevant information for our case study = the track name, the instruments and the duration.
+
+    Input : 
+        - folder_paths : list(string), the list of all file paths to go through while building the csv file
+        - csv_file_name : string, the name of the file to create
+
+    Output 
+        - df : DataFrame, the dataframe of the csv just created
+    """
+
     # Get the list of files in the folders
     files = [os.listdir(folder_path) for folder_path in folder_paths]
 
@@ -83,5 +104,8 @@ def build_train_csv(folder_paths, csv_file_name):
     df = pd.read_csv(csv_file_name)
     return df
 
+
+# Calling the functions to build our dataset
+
 #build_test_csv(TEST_PATHS, 'test_data.csv')
-build_train_csv(TRAIN_PATHS, 'train_data.csv')
+#build_train_csv(TRAIN_PATHS, 'train_data.csv')
