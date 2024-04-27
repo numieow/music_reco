@@ -37,6 +37,6 @@ Notre meilleur résultat en accuracy
 
 Notre meilleur résultat en loss
 
-![bs = 32, vs = 0.4, epochs = 150](./img/model_accuracy.png)
+![bs = 32, vs = 0.4, epochs = 130](./img/model_accuracy.png)
 
-![bs = 32, vs = 0.4, epochs = 150](./img/model_loss.png)
+![bs = 32, vs = 0.4, epochs = 130](./img/model_loss.png)
